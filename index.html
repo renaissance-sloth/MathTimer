@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MathTimer — Serverless MVP</title>
+  <meta name="description" content="GitHub Pages에서 동작하는 무서버(MathTimer) MVP. LocalStorage 저장, 문제풀이 타이머, 통계/리포트." />
+  <style>
+    :root{
+      --bg:#0b0f1a; --panel:#11172a; --muted:#7f8da3; --text:#e6edf6; --accent:#6aa9ff; --accent-2:#87f5c6; --danger:#ff6b6b; --warn:#ffd166;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(180deg,#0a0f18,#0d1321 40%,#0b0f1a);color:var(--text);font:16px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji"}
+    a{color:var(--accent)}
+    header{position:sticky;top:0;z-index:30;background:rgba(13,19,33,.85);backdrop-filter:saturate(120%) blur(8px);border-bottom:1px solid #1a2340}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:28px;height:28px;border-radius:8px;background:conic-gradient(from 220deg at 50% 50%, var(--accent), var(--accent-2));box-shadow:0 0 18px rgba(106,169,255,.35)}
+    nav{display:flex;gap:12px;align-items:center}
+    nav button{background:#18213b;border:1px solid #223055;color:var(--text);padding:8px 12px;border-radius:12px;cursor:pointer}
+    nav button.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(106,169,255,.25) inset}
+    main{padding:24px 0}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+    .card{background:var(--panel);border:1px solid #1a2340;border-radius:16px;padding:16px;box-shadow:0 4px 30px rgba(0,0,0,.25)}
+    .card h3{margin:0 0 8px;font-size:18px}
+    .muted{color:var(--muted)}
+    .stat{font-size:28px;font-weight:700}
+    .btn{background:linear-gradient(180deg,#203059,#1a2544);border:1px solid #2a3b6d;color:var(--text);padding:10px 14px;border-radius:12px;cursor:pointer}
+    .btn:hover{filter:brightness(1.05)}
+    .btn.primary{background:linear-gradient(180deg,#3a67ff,#2a55e6);border-color:#3a67ff}
+    .btn.ghost{background:transparent;border-color:#2a355a}
+    .btn.warn{background:linear-gradient(180deg,#ffb703,#f29e02);border-color:#f4a902;color:#161616}
+    .btn.danger{background:linear-gradient(180deg,#ff5f7a,#ff4d4d);border-color:#ff4d4d}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    .controls select,.controls input[type="number"],.controls input[type="text"]{background:#12192c;border:1px solid #223055;color:var(--text);padding:8px 10px;border-radius:10px}
+    .toggle{display:inline-flex;align-items:center;gap:8px}
+    .pill{display:inline-flex;gap:6px;align-items:center;background:#12192c;border:1px solid #223055;color:var(--text);padding:6px 10px;border-radius:999px}
+    .badge{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #253560;background:#141c33;color:var(--muted);font-size:12px}
+    .view{display:none}
+    .view.active{display:block}
+    .qbox{padding:16px;border-radius:12px;background:#0c1428;border:1px solid #1a2340}
+    .options{display:grid;gap:10px;margin-top:12px}
+    .opt{padding:10px 12px;border-radius:10px;background:#121a31;border:1px solid #223055;cursor:pointer;text-align:left}
+    .opt.selected{border-color:var(--accent)}
+    .opt.correct{border-color:var(--accent-2);background:rgba(135,245,198,0.08)}
+    .opt.wrong{border-color:var(--danger);background:rgba(255,107,107,0.08)}
+    .timer{font-variant-numeric:tabular-nums;font-size:20px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid #1a2340;text-align:left}
+    th{color:var(--muted);font-weight:500}
+    .bar{height:8px;background:#132042;border-radius:6px;overflow:hidden}
+    .bar > span{display:block;height:8px;background:linear-gradient(90deg,var(--accent),#6ee7f9);width:0}
+    footer{color:#8ea2c6;border-top:1px solid #1a2340}
+    .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;background:#0d152a;border:1px solid #1e2a4f;border-bottom-width:3px;padding:2px 6px;border-radius:6px}
+    .help{font-size:13px;color:#8ea2c6}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap row" style="justify-content:space-between">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <div style="font-weight:800">MathTimer</div>
+          <div class="muted" style="font-size:12px">Serverless MVP · GitHub Pages</div>
+        </div>
+      </div>
+      <nav class="row">
+        <button class="navbtn active" data-view="dashboard">대시보드</button>
+        <button class="navbtn" data-view="practice">문제풀이</button>
+        <button class="navbtn" data-view="report">리포트</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- DASHBOARD VIEW -->
+    <section id="dashboard" class="view active">
+      <div class="grid">
+        <div class="card" style="grid-column: span 6;">
+          <h3>요약 지표</h3>
+          <div class="grid" style="grid-template-columns: repeat(3, 1fr); gap: 12px;">
+            <div>
+              <div class="muted">전체 정답률</div>
+              <div class="stat" id="stat-acc">-</div>
+              <div class="bar"><span id="bar-acc"></span></div>
+            </div>
+            <div>
+              <div class="muted">평균 풀이 시간</div>
+              <div class="stat" id="stat-time">-</div>
+            </div>
+            <div>
+              <div class="muted">총 시도 수</div>
+              <div class="stat" id="stat-total">-</div>
+            </div>
+          </div>
+          <div class="help" style="margin-top:8px">단축키: <span class="kbd">1-4</span> 보기 선택 · <span class="kbd">Enter</span> 제출 · <span class="kbd">N</span> 다음 문제</div>
+        </div>
+
+        <div class="card" style="grid-column: span 6;">
+          <h3>빠른 실행</h3>
+          <div class="controls">
+            <button class="btn primary" id="btn-start-now">학습 시작하기</button>
+            <button class="btn" id="btn-export">데이터 내보내기</button>
+            <label class="btn ghost" for="importFile">데이터 가져오기</label>
+            <input type="file" id="importFile" accept="application/json" style="display:none" />
+            <button class="btn warn" id="btn-demo-problems">샘플 문제 불러오기</button>
+            <button class="btn danger" id="btn-reset">모든 데이터 초기화</button>
+          </div>
+          <p class="help">데이터는 이 브라우저의 LocalStorage에만 저장됩니다. 브라우저 초기화 시 데이터가 삭제될 수 있습니다.</p>
+        </div>
+
+        <div class="card" style="grid-column: span 12;">
+          <h3>유형별 통계</h3>
+          <div class="muted" style="margin-bottom:6px">시도 수 3회 이상인 태그 기준</div>
+          <table>
+            <thead>
+              <tr><th>태그</th><th>시도 수</th><th>정답률</th><th>평균 시간</th></tr>
+            </thead>
+            <tbody id="tbody-tags"></tbody>
+          </table>
+        </div>
+
+        <div class="card" style="grid-column: span 12;">
+          <h3>취약 유형 TOP3</h3>
+          <div id="weak-tags" class="row"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PRACTICE VIEW -->
+    <section id="practice" class="view">
+      <div class="card">
+        <h3>문제 필터</h3>
+        <div class="controls" style="margin-bottom:12px">
+          <select id="filter-tag"></select>
+          <select id="filter-diff"></select>
+          <label class="toggle"><input type="checkbox" id="toggle-random" checked /> 무작위 출제</label>
+          <label class="toggle"><input type="checkbox" id="toggle-instant" checked /> 즉시 정답 확인</label>
+          <span class="pill">
+            제한 시간(초)
+            <input type="number" id="limit-sec" min="0" value="0" style="width:90px" />
+          </span>
+          <button class="btn" id="btn-next">다음 문제</button>
+        </div>
+        <div class="row" style="justify-content:space-between;margin-bottom:8px">
+          <div>현재 태그: <span class="badge" id="badge-tag">-</span> 난이도: <span class="badge" id="badge-diff">-</span></div>
+          <div class="timer">⏱️ <span id="timer">00:00.0</span></div>
+        </div>
+        <div class="qbox" id="qbox">
+          <div id="question" style="font-size:18px;font-weight:600;">문제를 불러오세요.</div>
+          <div class="options" id="options"></div>
+        </div>
+        <div class="row" style="margin-top:12px;justify-content:space-between">
+          <div class="help">선택: <span class="kbd">1-4</span> · 제출: <span class="kbd">Enter</span></div>
+          <div class="controls">
+            <button class="btn primary" id="btn-submit">정답 제출</button>
+            <button class="btn ghost" id="btn-skip">건너뛰기</button>
+          </div>
+        </div>
+        <div id="feedback" class="help" style="margin-top:10px"></div>
+      </div>
+    </section>
+
+    <!-- REPORT VIEW -->
+    <section id="report" class="view">
+      <div class="card">
+        <h3>리포트</h3>
+        <div id="report-body" class="muted">문제를 풀고 나면 자동으로 리포트가 생성됩니다.</div>
+        <div style="margin-top:12px" class="controls">
+          <button class="btn" id="btn-refresh-report">리포트 새로고침</button>
+          <button class="btn" id="btn-focus-weak">취약 유형으로 연습 시작</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="wrap" style="padding:16px 0">© 2025 MathTimer MVP · Serverless / LocalStorage · MIT License</div>
+  </footer>
+
+  <script>
+  // ============================
+  // Utility & Storage Layer
+  // ============================
+  const STORAGE = {
+    get(key, fallback){
+      try {
+        const v = localStorage.getItem(key);
+        return v ? JSON.parse(v) : (fallback ?? null);
+      } catch(e){ console.warn('Storage get error', e); return (fallback ?? null); }
+    },
+    set(key, value){
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch(e){ console.warn('Storage set error', e); }
+    },
+    remove(key){ try { localStorage.removeItem(key); } catch(e){} },
+    clear(){ try { localStorage.clear(); } catch(e){} }
+  };
+
+  const KEYS = {
+    attempts: 'mt_attempts',
+    settings: 'mt_settings',
+    problems: 'mt_problems' // 사용자(관리자)가 가져온 문제를 저장
+  };
+
+  function fmtSec(sec){
+    if(!isFinite(sec) || sec < 0) return '-';
+    const m = Math.floor(sec/60);
+    const s = sec % 60;
+    return `${String(m).padStart(2,'0')}:${s.toFixed(1).padStart(4,'0')}`;
+  }
+
+  function uid(){ return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+
+  // ============================
+  // Data & Problem Source
+  // ============================
+  // 내장 샘플 문제 (필요시 problems.json을 fetch하여 덮어씀)
+  window.PROBLEMS = [
+    {id:1, question:"다음 중 소수(prime number)는?", options:["4","5","6","8"], answerIndex:1, difficulty:1, tags:["수","소수"]},
+    {id:2, question:"부등식 2x+3>7의 해는?", options:["x>1","x>2","x>3","x>4"], answerIndex:1, difficulty:1, tags:["부등식"]},
+    {id:3, question:"함수 f(x)=x^2의 x=3에서의 값은?", options:["6","8","9","12"], answerIndex:2, difficulty:1, tags:["함수"]},
+    {id:4, question:"확률에서 주사위 1회 던져 3이 나올 확률은?", options:["1/2","1/3","1/4","1/6"], answerIndex:3, difficulty:1, tags:["확률"]},
+    {id:5, question:"수열 an=2n의 a5 값은?", options:["5","8","10","12"], answerIndex:2, difficulty:2, tags:["수열"]},
+    {id:6, question:"직각삼각형 빗변이 13, 한 변이 5일 때 다른 변은?", options:["8","10","12","14"], answerIndex:0, difficulty:2, tags:["기하","피타고라스"]},
+    {id:7, question:"미분: f(x)=x^3의 도함수는?", options:["x^2","2x","3x^2","3x^3"], answerIndex:2, difficulty:2, tags:["미분"]},
+    {id:8, question:"로그: log10(1000)=?", options:["2","2.5","3","0.3"], answerIndex:2, difficulty:1, tags:["로그"]},
+    {id:9, question:"확률: 동전 2번 던져 앞면 2번 나올 확률은?", options:["1/2","1/3","1/4","1/6"], answerIndex:2, difficulty:1, tags:["확률"]},
+    {id:10, question:"함수 f(x)=2x+1에서 f(4)=?", options:["7","8","9","10"], answerIndex:2, difficulty:1, tags:["함수"]},
+    {id:11, question:"등차수열 첫항1 공차3, a4=?", options:["7","10","12","13"], answerIndex:3, difficulty:2, tags:["수열"]},
+    {id:12, question:"부등식 |x-2|<3 의 해는?", options:["-1<x<5","-3<x<3","-1<x<3","0<x<5"], answerIndex:0, difficulty:3, tags:["부등식","절댓값"]}
+  ];
+
+  async function loadProblems(){
+    const cached = STORAGE.get(KEYS.problems, null);
+    if(cached && Array.isArray(cached)) return cached;
+    try{
+      const res = await fetch('./problems.json', {cache:'no-store'});
+      if(res.ok){
+        const data = await res.json();
+        if(Array.isArray(data) && data.length){
+          STORAGE.set(KEYS.problems, data);
+          return data;
+        }
+      }
+    }catch(e){ /* ignore */ }
+    // fallback to built-in
+    return window.PROBLEMS;
+  }
+
+  // ============================
+  // Stats & Analytics
+  // ============================
+  function computeStats(attempts){
+    const total = attempts.length;
+    const correct = attempts.filter(a=>a.isCorrect).length;
+    const accuracy = total ? correct/total : 0;
+    const avgTime = total ? attempts.reduce((s,a)=>s+a.timeTaken,0)/total : 0;
+
+    // byTag
+    const byTagMap = new Map();
+    for(const a of attempts){
+      for(const t of (a.tags||['기타'])){
+        if(!byTagMap.has(t)) byTagMap.set(t, {tag:t, total:0, correct:0, timeSum:0});
+        const obj = byTagMap.get(t);
+        obj.total += 1; obj.correct += (a.isCorrect?1:0); obj.timeSum += a.timeTaken;
+      }
+    }
+    const byTag = Array.from(byTagMap.values()).map(x=>({
+      tag:x.tag,
+      total:x.total,
+      accuracy: x.total? x.correct/x.total : 0,
+      avgTime: x.total? x.timeSum/x.total : 0
+    })).sort((a,b)=>a.tag.localeCompare(b.tag));
+
+    return { total, correct, accuracy, avgTime, byTag };
+  }
+
+  function getWeakTags(stats){
+    // 기준: 시도>=3, 낮은 정답률 우선, 동률이면 더 많이 푼 태그 우선
+    return stats.byTag
+      .filter(x=>x.total>=3)
+      .sort((a,b)=> (a.accuracy - b.accuracy) || (b.total - a.total))
+      .slice(0,3);
+  }
+
+  // ============================
+  // Session / Practice Engine
+  // ============================
+  const Engine = {
+    problems: [],
+    filtered: [],
+    current: null,
+    selectedIndex: null,
+    timer: null,
+    startedAt: 0,
+    limitSec: 0,
+    timeoutId: null,
+
+    filters: { tag:'전체', diff:'전체', random:true, instant:true },
+
+    init(problems){
+      this.problems = problems;
+      this.applyFilters();
+    },
+    uniqueTags(){
+      const set = new Set();
+      this.problems.forEach(p=> (p.tags||[]).forEach(t=> set.add(t)) );
+      return Array.from(set).sort((a,b)=>a.localeCompare(b));
+    },
+    applyFilters(){
+      const {tag,diff} = this.filters;
+      this.filtered = this.problems.filter(p=>{
+        const t = (tag==='전체') || (p.tags && p.tags.includes(tag));
+        const d = (diff==='전체') || (String(p.difficulty)===String(diff));
+        return t && d;
+      });
+    },
+    pick(){
+      if(!this.filtered.length) return null;
+      const idx = this.filters.random ? Math.floor(Math.random()*this.filtered.length) : 0;
+      return this.filtered[idx];
+    },
+    loadNext(){
+      this.current = this.pick();
+      this.selectedIndex = null;
+      this.stopTimer();
+      if(this.current){ this.startTimer(); }
+      return this.current;
+    },
+    startTimer(){
+      this.startedAt = performance.now();
+      this.updateTimerUI(0);
+      clearInterval(this.timer); this.timer = setInterval(()=>{
+        const elapsed = (performance.now()-this.startedAt)/1000;
+        this.updateTimerUI(elapsed);
+      }, 100);
+      // limit
+      clearTimeout(this.timeoutId);
+      const limit = Number(this.limitSec)||0;
+      if(limit>0){
+        this.timeoutId = setTimeout(()=>{
+          stopAndAutoSubmit(false,'시간 초과');
+        }, limit*1000);
+      }
+    },
+    stopTimer(){ clearInterval(this.timer); clearTimeout(this.timeoutId); },
+    elapsedSec(){ return (performance.now()-this.startedAt)/1000; },
+    updateTimerUI(sec){ document.getElementById('timer').textContent = fmtSec(sec); }
+  };
+
+  // ============================
+  // Attempts CRUD
+  // ============================
+  function getAttempts(){ return STORAGE.get(KEYS.attempts, []); }
+  function saveAttempt(att){ const arr = getAttempts(); arr.push(att); STORAGE.set(KEYS.attempts, arr); return arr; }
+  function clearData(){ STORAGE.clear(); }
+
+  // ============================
+  // UI Binding
+  // ============================
+  const views = ['dashboard','practice','report'];
+  function showView(id){
+    for(const v of views){ document.getElementById(v).classList.toggle('active', v===id); }
+    document.querySelectorAll('.navbtn').forEach(btn=> btn.classList.toggle('active', btn.dataset.view===id));
+    if(id==='dashboard') renderDashboard();
+    if(id==='report') renderReport();
+  }
+
+  document.querySelectorAll('.navbtn').forEach(b=> b.addEventListener('click',()=> showView(b.dataset.view)));
+  document.getElementById('btn-start-now').addEventListener('click', ()=>{ showView('practice'); nextQuestion(); });
+
+  // Import / Export / Reset / Demo problems
+  document.getElementById('btn-export').addEventListener('click', ()=>{
+    const data = { version:1, exportedAt: new Date().toISOString(), attempts: getAttempts() };
+    const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=`MathTimer_export_${Date.now()}.json`; a.click(); URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('importFile').addEventListener('change', async (e)=>{
+    const file = e.target.files?.[0]; if(!file) return;
+    const text = await file.text();
+    try{
+      const obj = JSON.parse(text);
+      if(Array.isArray(obj.attempts)) STORAGE.set(KEYS.attempts, obj.attempts);
+      alert('가져오기 완료');
+      renderDashboard(); renderReport();
+    }catch(err){ alert('JSON 파싱 실패'); }
+    e.target.value = '';
+  });
+
+  document.getElementById('btn-reset').addEventListener('click',()=>{
+    if(confirm('모든 데이터(시도 기록, 커스텀 문제)를 삭제합니다. 계속할까요?')){ clearData(); alert('초기화 완료'); location.reload(); }
+  });
+
+  document.getElementById('btn-demo-problems').addEventListener('click',()=>{
+    STORAGE.set(KEYS.problems, window.PROBLEMS);
+    alert('샘플 문제가 적용되었습니다. 문제풀이에서 확인하세요.');
+  });
+
+  // Practice controls
+  const selTag = document.getElementById('filter-tag');
+  const selDiff = document.getElementById('filter-diff');
+  const toggleRandom = document.getElementById('toggle-random');
+  const toggleInstant = document.getElementById('toggle-instant');
+  const limitSecInput = document.getElementById('limit-sec');
+  document.getElementById('btn-next').addEventListener('click', nextQuestion);
+  document.getElementById('btn-submit').addEventListener('click', submitAnswer);
+  document.getElementById('btn-skip').addEventListener('click', ()=> stopAndAutoSubmit(null,'건너뜀'));
+
+  function populateFilters(){
+    // 태그
+    const tags = ['전체', ...Engine.uniqueTags()];
+    selTag.innerHTML = tags.map(t=>`<option value="${t}">${t}</option>`).join('');
+    // 난이도
+    const diffs = ['전체',1,2,3,4,5];
+    selDiff.innerHTML = diffs.map(d=>`<option value="${d}">${d}</option>`).join('');
+  }
+
+  selTag.addEventListener('change', ()=>{ Engine.filters.tag = selTag.value; Engine.applyFilters(); updateBadges(); });
+  selDiff.addEventListener('change', ()=>{ Engine.filters.diff = selDiff.value; Engine.applyFilters(); updateBadges(); });
+  toggleRandom.addEventListener('change', ()=> Engine.filters.random = toggleRandom.checked);
+  toggleInstant.addEventListener('change', ()=> Engine.filters.instant = toggleInstant.checked);
+  limitSecInput.addEventListener('change', ()=> Engine.limitSec = Number(limitSecInput.value||0));
+
+  function updateBadges(){
+    document.getElementById('badge-tag').textContent = Engine.filters.tag;
+    document.getElementById('badge-diff').textContent = Engine.filters.diff;
+  }
+
+  function renderQuestion(){
+    const q = Engine.current; const qEl = document.getElementById('question'); const opsEl = document.getElementById('options');
+    const fb = document.getElementById('feedback'); fb.textContent = '';
+    if(!q){ qEl.textContent = '필터에 해당하는 문제가 없습니다. 필터를 변경하세요.'; opsEl.innerHTML=''; return; }
+    qEl.textContent = q.question;
+    opsEl.innerHTML = '';
+    q.options.forEach((opt, i)=>{
+      const btn = document.createElement('button');
+      btn.className = 'opt'; btn.textContent = `${i+1}. ${opt}`;
+      btn.addEventListener('click',()=> selectOption(i, btn));
+      opsEl.appendChild(btn);
+    });
+    document.getElementById('btn-submit').disabled = false;
+  }
+
+  function selectOption(i, el){
+    Engine.selectedIndex = i;
+    document.querySelectorAll('.opt').forEach(x=> x.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  function nextQuestion(){
+    Engine.applyFilters();
+    const q = Engine.loadNext();
+    updateBadges();
+    renderQuestion();
+  }
+
+  function stopAndAutoSubmit(isCorrect, reason){
+    Engine.stopTimer();
+    const elapsed = Engine.elapsedSec();
+    const q = Engine.current; if(!q) return;
+    const selected = (Engine.selectedIndex!=null)? Engine.selectedIndex : -1;
+    const auto = (isCorrect===null); // skip
+    const correct = (isCorrect!=null) ? isCorrect : (selected===q.answerIndex);
+
+    // Save attempt
+    const att = { id: uid(), problemId: q.id, selectedIndex: selected, answerIndex: q.answerIndex, isCorrect: !!correct, timeTaken: Math.max(0, elapsed), difficulty: q.difficulty, tags: q.tags, createdAt: new Date().toISOString(), meta: reason||'' };
+    saveAttempt(att);
+
+    // Feedback marking
+    const opts = document.querySelectorAll('.opt');
+    opts.forEach((b, idx)=>{
+      if(idx===q.answerIndex) b.classList.add('correct');
+      if(idx===selected && idx!==q.answerIndex) b.classList.add('wrong');
+      b.disabled = true;
+    });
+
+    const fb = document.getElementById('feedback');
+    if(auto && reason==='건너뜀') fb.textContent = `건너뜀 · 경과 ${fmtSec(elapsed)}`;
+    else if(!correct && reason==='시간 초과') fb.textContent = `시간 초과 · 정답: ${q.options[q.answerIndex]} · 경과 ${fmtSec(elapsed)}`;
+    else fb.textContent = `${correct? '정답':'오답'} · 정답: ${q.options[q.answerIndex]} · 경과 ${fmtSec(elapsed)}`;
+
+    renderDashboardMinimal(); // 빠른 갱신
+  }
+
+  function submitAnswer(){
+    if(!Engine.current){ return; }
+    if(Engine.selectedIndex==null){ alert('보기를 선택하세요.'); return; }
+    Engine.stopTimer();
+    const correct = Engine.selectedIndex === Engine.current.answerIndex;
+    // 즉시 피드백
+    if(Engine.filters.instant){
+      stopAndAutoSubmit(correct);
+    } else {
+      // 즉시 피드백 비활성화: 저장만 하고 표시 X
+      const elapsed = Engine.elapsedSec();
+      const q = Engine.current;
+      const att = { id: uid(), problemId: q.id, selectedIndex: Engine.selectedIndex, answerIndex: q.answerIndex, isCorrect: correct, timeTaken: Math.max(0, elapsed), difficulty: q.difficulty, tags: q.tags, createdAt: new Date().toISOString(), meta:'' };
+      saveAttempt(att);
+      document.getElementById('feedback').textContent = `제출됨 · 경과 ${fmtSec(elapsed)}`;
+      renderDashboardMinimal();
+    }
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e)=>{
+    const viewPractice = document.getElementById('practice').classList.contains('active');
+    if(!viewPractice) return;
+    if(e.key>='1' && e.key<='9'){
+      const idx = Number(e.key)-1; const opts = document.querySelectorAll('.opt'); if(opts[idx]) opts[idx].click();
+    }
+    if(e.key==='Enter') submitAnswer();
+    if(e.key==='n' || e.key==='N') nextQuestion();
+  });
+
+  // ============================
+  // Dashboard & Report Rendering
+  // ============================
+  function renderDashboard(){
+    const attempts = getAttempts();
+    const stats = computeStats(attempts);
+    // headline
+    document.getElementById('stat-total').textContent = String(stats.total);
+    document.getElementById('stat-acc').textContent = `${(stats.accuracy*100||0).toFixed(1)}%`;
+    document.getElementById('bar-acc').style.width = `${Math.round(stats.accuracy*100)}%`;
+    document.getElementById('stat-time').textContent = fmtSec(stats.avgTime||0);
+
+    // tags table
+    const tbody = document.getElementById('tbody-tags');
+    tbody.innerHTML = '';
+    const rows = stats.byTag.filter(x=>x.total>=3);
+    if(!rows.length){
+      tbody.innerHTML = `<tr><td colspan="4" class="muted">유형별 통계를 보려면 최소 3회 이상 시도하세요.</td></tr>`;
+    } else {
+      for(const r of rows){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.tag}</td><td>${r.total}</td><td>${(r.accuracy*100).toFixed(1)}%</td><td>${fmtSec(r.avgTime)}</td>`;
+        tbody.appendChild(tr);
+      }
+    }
+
+    // weak tags
+    const weak = getWeakTags(stats);
+    const wrap = document.getElementById('weak-tags'); wrap.innerHTML='';
+    if(!weak.length){ wrap.innerHTML = '<span class="muted">취약 유형이 아직 없습니다.</span>'; }
+    for(const w of weak){
+      const pill = document.createElement('span');
+      pill.className = 'pill';
+      pill.textContent = `${w.tag} · 정답률 ${(w.accuracy*100).toFixed(1)}% · ${w.total}회`;
+      pill.style.cursor='pointer';
+      pill.addEventListener('click',()=>{
+        // set filter and navigate
+        Engine.filters.tag = w.tag; selTag.value = w.tag; showView('practice'); nextQuestion();
+      });
+      wrap.appendChild(pill);
+    }
+  }
+
+  function renderDashboardMinimal(){
+    const attempts = getAttempts();
+    const stats = computeStats(attempts);
+    document.getElementById('stat-total').textContent = String(stats.total);
+    document.getElementById('stat-acc').textContent = `${(stats.accuracy*100||0).toFixed(1)}%`;
+    document.getElementById('bar-acc').style.width = `${Math.round(stats.accuracy*100)}%`;
+    document.getElementById('stat-time').textContent = fmtSec(stats.avgTime||0);
+  }
+
+  function renderReport(){
+    const attempts = getAttempts();
+    if(!attempts.length){ document.getElementById('report-body').innerHTML = '<div class="muted">시도 기록이 없습니다.</div>'; return; }
+    const stats = computeStats(attempts);
+    const weak = getWeakTags(stats);
+
+    const lines = [];
+    lines.push(`<div class="row" style="gap:16px;flex-wrap:wrap">`);
+    lines.push(`<div class="badge">총 시도 ${stats.total}회</div>`);
+    lines.push(`<div class="badge">전체 정답률 ${(stats.accuracy*100).toFixed(1)}%</div>`);
+    lines.push(`<div class="badge">평균 시간 ${fmtSec(stats.avgTime)}</div>`);
+    lines.push(`</div>`);
+
+    lines.push('<h4 style="margin-top:12px">취약 유형 TOP3</h4>');
+    if(!weak.length){ lines.push('<div class="muted">기준 충족 항목 없음</div>'); }
+    else{
+      lines.push('<ul>');
+      for(const w of weak){ lines.push(`<li>${w.tag} — 정답률 ${(w.accuracy*100).toFixed(1)}% · ${w.total}회</li>`); }
+      lines.push('</ul>');
+    }
+
+    lines.push('<h4 style="margin-top:12px">유형별 상세</h4>');
+    lines.push('<table><thead><tr><th>태그</th><th>시도</th><th>정답률</th><th>평균 시간</th></tr></thead><tbody>');
+    for(const r of stats.byTag){ lines.push(`<tr><td>${r.tag}</td><td>${r.total}</td><td>${(r.accuracy*100).toFixed(1)}%</td><td>${fmtSec(r.avgTime)}</td></tr>`); }
+    lines.push('</tbody></table>');
+
+    document.getElementById('report-body').innerHTML = lines.join('');
+  }
+
+  document.getElementById('btn-refresh-report').addEventListener('click', renderReport);
+  document.getElementById('btn-focus-weak').addEventListener('click', ()=>{
+    const attempts = getAttempts();
+    const stats = computeStats(attempts);
+    const weak = getWeakTags(stats);
+    if(!weak.length){ alert('취약 유형이 없습니다.'); return; }
+    const t = weak[0].tag; Engine.filters.tag=t; selTag.value=t; showView('practice'); nextQuestion();
+  });
+
+  // ============================
+  // Boot
+  // ============================
+  (async function(){
+    const problems = await loadProblems();
+    Engine.init(problems);
+    Engine.limitSec = 0;
+    // populate filters after Engine has problems
+    populateFilters(); updateBadges();
+    renderDashboard();
+  })();
+
+  </script>
+</body>
+</html>
